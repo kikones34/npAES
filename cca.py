@@ -35,7 +35,7 @@ def parse_traces_full(folder):
         with open(file) as f:
             # discard first line (reg names)
             next(f)
-            # reads lines until reaching round1_end
+            # read the rest of the lines
             for line in f:
                 pc, _, _, _, *rs = line.strip().split()
                 trace.regs["pc"].append(int(pc))
