@@ -1,6 +1,7 @@
 from aes import ShiftRows, SubBytes, sbox, pmul, gen_params, generate_keys, RotWord, SubWord, rcon
 import numpy as np
 from functools import lru_cache
+import os
 
 # this optimization reduces execution time by an order of magnitude
 pmul = lru_cache(maxsize=256*4)(pmul)
@@ -128,17 +129,28 @@ def reverse_key_schedule(last_key, last_key_idx, Nk, Nr):
             curr_key[:,pos] ^= curr_key[:,pos-1]
     return curr_key
 
-# helper function to retrieve a 128 bit key from the state matrix solution
+# Reverse key schedule tests
+def do_reverse_key_test(cipher_key):
+    Nk, Nr = gen_params(cipher_key)
+    round_keys = generate_keys(cipher_key, Nk, Nr)
+    recovered_key = reverse_key_schedule(round_keys[-1], Nr, Nk, Nr)
+    np_cipher_key = np.array(cipher_key, dtype=np.uint8).reshape(4,4).T
+    if np.all(np_cipher_key == recovered_key):
+        print("Correctly recovered key!")
+    else:
+        print(f"Could not recover key.\nCorrect key:\n{np_cipher_key}\nRecovered key:\n{recovered_key}")
+
+# Helper function to retrieve a 128 bit key from the state matrix solution
 def get_key(full_solution):
     k10 = ShiftRows(SubBytes(full_solution)) ^ correct
     return reverse_key_schedule(k10, 10, 4, 10)
 
+
 if __name__ == "__main__":
 
-    in_file = "outputs_DFA_AES128.dat"
+    in_file = os.path.join("samples", "outputs_DFA_AES128.dat")
     solver = find_unique_solution
-    rk_tests = False
-
+    
     vhex = np.vectorize("0x{:02x}".format)
 
     correct, faults = parse_faults(in_file)
@@ -148,19 +160,3 @@ if __name__ == "__main__":
     print(f"State matrix solution:\n{full_solution}")
     key = get_key(full_solution)
     print(f"Recovered cipher key:\n{vhex(key)}")
-
-    if rk_tests:
-        """ Reverse key schedule tests """
-        def do_reverse_key_test(cipher_key):
-            Nk, Nr = gen_params(cipher_key)
-            round_keys = generate_keys(cipher_key, Nk, Nr)
-            recovered_key = reverse_key_schedule(round_keys[-1], Nr, Nk, Nr)
-            np_cipher_key = np.array(cipher_key, dtype=np.uint8).reshape(4,4).T
-            if np.all(np_cipher_key == recovered_key):
-                print("Correctly recovered key!")
-            else:
-                print(f"Could not recover key.\nCorrect key:\n{np_cipher_key}\nRecovered key:\n{recovered_key}")
-
-        # 128 bits
-        print("Testing reverse key scheduling with 128 bits...")
-        do_reverse_key_test(range(16))
